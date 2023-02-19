@@ -463,7 +463,7 @@ def parse_parameters(l):
     if pending_kwonly and extrapos is None:
         l.error("named arguments must follow bare *")
 
-    return renpy.ast.ParameterInfo(parameters, positional, extrapos, extrakw, last_posonly, first_kwonly)
+    return renpy.ast.ParameterInfo.legacy(parameters, positional, extrapos, extrakw, last_posonly, first_kwonly)
 
 
 def parse_arguments(l):
