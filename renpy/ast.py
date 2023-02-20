@@ -58,13 +58,11 @@ def next_node(n):
     renpy.game.context().next_node = n
 
 
-class ParameterInfo(inspect.Signature):
+class Signature(inspect.Signature):
     """
-    Notable difference from the original Signature:
-    in python, the params' default attribute stores the actual default value, or Parameter.empty
-    if there is none. In renpy, the actual values are computed at call time, so the params' default
-    attribute stores a string which evals to the actual default value,
-    or Parameter.empty (not None) if there is none.
+    A version with all the API of ParameterInfo, but the default attribute of the Parameters
+    are the actual default values (like in inspect.Signature), and not strings.
+    Used in ATL.
     """
     __slots__ = ()
 
@@ -106,10 +104,6 @@ class ParameterInfo(inspect.Signature):
                 kind = inspect.Parameter.POSITIONAL_OR_KEYWORD
                 if name not in positional: # TODO: remove before flight
                     elist.append(Exception("Parameter {} found to be positional-or-keyword, but was apparently not positional at all".format(name)))
-
-            if default is None:
-                # necessary for the Parameters' repr to look good
-                default = inspect.Parameter.empty
 
             pars.append(inspect.Parameter(name, kind, default=default))
 
@@ -163,44 +157,15 @@ class ParameterInfo(inspect.Signature):
                 return n
         return None
 
-    @property
-    def _eval(self):
-        """
-        Returns a copy of self where the default values of the parameters
-        are the actual values and not the strings that eval to them.
-        Returns an actual Signature object, not a ParameterInfo (for that reason).
-        """
-
-        params_str = self.parameters.values()
-        param_eval = []
-        for p in params_str:
-            if p.default is not p.empty:
-                p = p.replace(default=renpy.python.py_eval(p.default))
-            param_eval.append(p)
-        return inspect.Signature(parameters=param_eval)
-
     def apply(self, args, kwargs, ignore_errors=False, partial=False):
         """
-        Contrary to the former method, *all* default values are evaluated at call time,
-        (instead of only those actually needed), which could cause different behaviors
-        in some particularly ugly edge cases where evaluation of parameters cause side-effects,
-        (arg=next(some_iterable)) or (arg1=ls.pop(), arg2=ls) for example.
-        This is a performance drawback which the c-boosted implementation may compensate for.
-        This could possibly be circumvented by using a subclass of Parameter that would
-        evaluate the default value only when needed, but I'm not sure it's worth it (and
-        not sure it would be documented wrt the inspect module).
-        The ignore_errors behavior is also likely different, but I believe much more
-        understandable now.
-        The partial feature is new - will probably be useful in ATL.
+        The partial feature is new, and is useful in ATL.
         """
 
-        # argument default values are evaluated at call time
-        evaled_signature = self._eval
         rv = None
-
         if not partial:
             try:
-                rv = evaled_signature.bind(*args, **kwargs)
+                rv = self.bind(*args, **kwargs)
             except Exception:
                 if ignore_errors:
                     rv = None
@@ -208,7 +173,7 @@ class ParameterInfo(inspect.Signature):
                     raise
         if rv is None: # either partial or (not partial and ignore_errors)
             try:
-                rv = evaled_signature.bind_partial(*args, **kwargs)
+                rv = self.bind_partial(*args, **kwargs)
             except Exception:
                 if ignore_errors:
                     return {}
@@ -218,6 +183,58 @@ class ParameterInfo(inspect.Signature):
         rv.apply_defaults()
         return rv.arguments
 
+class ParameterInfo(Signature):
+    """
+    Notable difference from the original Signature:
+    instead of having the params' default attribute store the actual default value, or Parameter.empty
+    if there is none, in this class the actual values are computed at call time, so the params' default
+    attribute stores a string which evals to the actual default value,
+    or Parameter.empty (not None) if there is none.
+    """
+    __slots__ = ()
+
+    def __init__(self, parameters=None, *args_, **kwargs_):
+        if parameters:
+            pars = []
+            for p in parameters:
+                if p.default is None:
+                    p = p.replace(default=p.empty)
+                elif p.default is p.empty:
+                    pass
+                elif not isinstance(p.default, str):
+                    raise TypeError("ParameterInfo takes strings or Parameter.empty, and accepts None. {!r} is not accepted.".format(p.default))
+                pars.append(p)
+            parameters = pars
+        super().__init__(parameters, *args_, **kwargs_)
+
+    def _eval(self):
+        """
+        Returns a copy of self where the default values of the parameters
+        are the actual values and not the strings that eval to them.
+        Returns a Signature object, not a ParameterInfo (for that reason).
+        """
+
+        params_str = self.parameters.values()
+        param_eval = []
+        for p in params_str:
+            if p.default is not p.empty:
+                p = p.replace(default=renpy.python.py_eval(p.default))
+            param_eval.append(p)
+        return Signature(parameters=param_eval)
+
+    def apply(self, *args_, **kwargs_):
+        """
+        Contrary to the former ParameterInfo method, *all* default values are evaluated at call time
+        (instead of only those actually needed), which could cause different behaviors
+        in some particularly ugly edge cases where evaluation of parameters cause side-effects,
+        (arg=next(some_iterable)) or (arg1=ls.pop(), arg2=ls) for example.
+        This is a minor performance drawback which the c-boosted implementation may compensate for.
+        This could possibly be circumvented by using a subclass of Parameter that would
+        evaluate the default value only when needed, but I'm not sure it's worth it (and
+        not sure it would be documented wrt the inspect module).
+        """
+
+        return self._eval().apply(*args_, **kwargs_)
 
 def apply_arguments(parameters, args, kwargs, ignore_errors=False):
 
