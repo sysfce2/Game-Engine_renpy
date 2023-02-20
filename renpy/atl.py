@@ -526,10 +526,10 @@ class ATLTransformBase(renpy.object.Object):
             if (p.kind is p.POSITIONAL_OR_KEYWORD) and (p.default is not p.empty) and (n not in passedargs) and (n not in new_parameters):
                 new_parameters[n] = good_default(p).replace(kind=p.KEYWORD_ONLY)
 
-        # seventh, passed non-pos-only parameters
-        # changed to kw-only, defaulted to value passed
+        # seventh, passed [pos-or-kw or defaulted kw-only] parameters
+        # changed to kw-only, defaulted to evaluated value
         for n, p in signature.parameters.items():
-            if (p.kind is not p.POSITIONAL_ONLY) and (n in passedargs):
+            if ((p.kind is p.POSITIONAL_OR_KEYWORD) or (p.kind is p.KEYWORD_ONLY) and (p.default is not p.empty)) and (n in passedargs):
                 new_parameters[n] = p.replace(kind=p.KEYWORD_ONLY, default=allargs[n])
 
         # eighth, the variadic keyword dict
