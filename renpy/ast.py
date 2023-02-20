@@ -158,10 +158,6 @@ class Signature(inspect.Signature):
         return None
 
     def apply(self, args, kwargs, ignore_errors=False, partial=False):
-        """
-        The partial feature is new, and is useful in ATL.
-        """
-
         rv = None
         if not partial:
             try:
@@ -232,9 +228,16 @@ class ParameterInfo(Signature):
         This could possibly be circumvented by using a subclass of Parameter that would
         evaluate the default value only when needed, but I'm not sure it's worth it (and
         not sure it would be documented wrt the inspect module).
+        This method still exists so that when ignore_errors, the parameters aren't evaluated twice.
         """
 
         return self._eval().apply(*args_, **kwargs_)
+
+    def bind(self, *args, **kwargs):
+        return self._eval().bind(*args, **kwargs)
+
+    def bind_partial(self, *args, **kwargs):
+        return self._eval().bind_partial(*args, **kwargs)
 
 def apply_arguments(parameters, args, kwargs, ignore_errors=False):
 

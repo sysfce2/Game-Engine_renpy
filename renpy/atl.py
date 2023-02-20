@@ -424,13 +424,6 @@ class ATLTransformBase(renpy.object.Object):
 
         child = None
 
-        # remove any parameter already eval-ed in previous currying calls
-        # they were removed from the signature, because the value needed
-        # to be compiled the first time rather than now
-        for k, v in tuple(kwargs.items()):
-            if k in context:
-                context[k] = v
-
         signature = self.parameters
         positional = signature.positional
         extrapos = signature.extrapos
@@ -449,10 +442,13 @@ class ATLTransformBase(renpy.object.Object):
         # if ("child" in kwargs) and (("child" not in signature.parameters) or (signature.parameters["child"].kind=Parameter.POSITIONAL_ONLY)): # not backwards-consistent, but makes more sense
         #     child = kwargs.pop("child")
 
-        appdict = signature.apply(args=args, kwargs=kwargs, partial=True)
+        boundargs = signature.bind_partial(*args, **kwargs) # inspect.BoundArguments object
+        passedargs = boundargs.arguments # dict of the resolved values passed to the function (used to know what was passed or not)
+        boundargs.apply_defaults()
+        allargs = boundargs.arguments # same, but with the default values applied (used to update the context)
 
         if child is None: # for backwards consistency
-            for k, v in appdict.items(): # first set, first served : legacy behavior
+            for k, v in allargs.items(): # last set survives : legacy behavior
                 if k == "child":
                     if "child" not in positional: # for backwards consistency
                         child = v
@@ -461,13 +457,13 @@ class ATLTransformBase(renpy.object.Object):
 
         if extrapos:
             context.setdefault(extrapos, ())
-            context[extrapos] += appdict.pop(extrapos, ())
+            context[extrapos] += allargs.pop(extrapos, ())
 
         if extrakw:
             context.setdefault(extrakw, renpy.revertable.RevertableDict())
-            context[extrakw].update(appdict.pop(extrakw, {}))
+            context[extrakw].update(allargs.pop(extrakw, {}))
 
-        context.update(appdict)
+        context.update(allargs)
 
         if child is None:
             child = self.child
@@ -475,29 +471,72 @@ class ATLTransformBase(renpy.object.Object):
         if getattr(child, '_duplicatable', False):
             child = child._duplicate(_args)
 
+        if isinstance(signature, renpy.ast.ParameterInfo):
+            def good_default(p):
+                """
+                Returns the parameter with its default evaluated, if not empty.
+                """
+                if p.default is not p.empty:
+                    return p.replace(default=allargs[p.name])
+                else:
+                    return p
+        else:
+            good_default = lambda p: p
+
         # Create a new ATL Transform.
-        new_parameters = []
-        for n in positional:
-            if n not in appdict:
-                new_parameters.append(signature.parameters[n])
+        new_parameters = {}
 
-        if extrapos:
-            new_parameters.append(signature.parameters[extrapos])
-
+        # first, non-passed pos-only parameters
+        # unchanged, may have a default or not
         for n, p in signature.parameters.items():
-            # keyword-only required arguments not given a value
-            if p.kind == p.KEYWORD_ONLY and (n not in appdict):
-                new_parameters.append(p)
+            if (p.kind is p.POSITIONAL_ONLY) and (n not in passedargs):
+                new_parameters[n] = good_default(p)
 
-        # no parameter with a given value can survive this point
-        # otherwise defaulted ones would be evaluated twice
-        # and for ones already passed a value, we don't have an evaluable string for arbitrary values
-        # (reminder: ParameterInfo stores evaluable strings as default values for arguments)
+        # second, non-passed pos-or-kw parameters,
+        # until (and not counting) the first one passed by keyword
+        # unchanged, may have a default or not
+        for n, p in signature.parameters.items():
+            if p.kind is p.POSITIONAL_OR_KEYWORD:
+                if n in kwargs:
+                    break
+                if n not in passedargs:
+                    new_parameters[n] = good_default(p)
 
+        # third, the variadic positional tuple (yes)
+        if extrapos:
+            new_parameters[extrapos] = signature.parameters[extrapos]
+
+        # fourth, non-passed non-defaulted (=required) pos-or-kw parameters
+        # only the ones not already added (at step 2)
+        # changed to kw-only
+        for n, p in signature.parameters.items():
+            if (p.kind is p.POSITIONAL_OR_KEYWORD) and (p.default is p.empty) and (n not in passedargs) and (n not in new_parameters):
+                new_parameters[n] = p.replace(kind=p.KEYWORD_ONLY)
+
+        # fifth, non-passed non-defaulted (=required) keyword-only parameters
+        # unchanged
+        for n, p in signature.parameters.items():
+            if (p.kind is p.KEYWORD_ONLY) and (p.default is p.empty) and (n not in passedargs):
+                new_parameters[n] = p
+
+        # sixth, non-passed defaulted pos-or-kw parameters
+        # only the ones not already added (at step 2)
+        # changed to kw-only
+        for n, p in signature.parameters.items():
+            if (p.kind is p.POSITIONAL_OR_KEYWORD) and (p.default is not p.empty) and (n not in passedargs) and (n not in new_parameters):
+                new_parameters[n] = good_default(p).replace(kind=p.KEYWORD_ONLY)
+
+        # seventh, passed non-pos-only parameters
+        # changed to kw-only, defaulted to value passed
+        for n, p in signature.parameters.items():
+            if (p.kind is not p.POSITIONAL_ONLY) and (n in passedargs):
+                new_parameters[n] = p.replace(kind=p.KEYWORD_ONLY, default=allargs[n])
+
+        # eighth, the variadic keyword dict
         if extrakw:
-            new_parameters.append(signature.parameters[extrakw])
+            new_parameters[extrakw] = signature.parameters[extrakw]
 
-        new_signature = renpy.ast.ParameterInfo(new_parameters)
+        new_signature = renpy.ast.Signature(tuple(new_parameters.values()))
 
         rv = renpy.display.motion.ATLTransform(
             atl=self.atl,
