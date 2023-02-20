@@ -424,6 +424,13 @@ class ATLTransformBase(renpy.object.Object):
 
         child = None
 
+        # remove any parameter already eval-ed in previous currying calls
+        # they were removed from the signature, because the value needed
+        # to be compiled the first time rather than now
+        for k, v in tuple(kwargs.items()):
+            if k in context:
+                context[k] = v
+
         signature = self.parameters
         positional = signature.positional
         extrapos = signature.extrapos
@@ -478,16 +485,14 @@ class ATLTransformBase(renpy.object.Object):
             new_parameters.append(signature.parameters[extrapos])
 
         for n, p in signature.parameters.items():
-            # keyword-only required arguments go first
+            # keyword-only required arguments not given a value
             if p.kind == p.KEYWORD_ONLY and (n not in appdict):
                 new_parameters.append(p)
 
-        for n, p in signature.parameters.items():
-            # arguments having a value (either the default one or one passed by argument) go next
-            if (n in appdict) and (p.kind not in (p.VAR_POSITIONAL, p.VAR_KEYWORD)):
-                # their new default is the value - whether it was the former default or not
-                p = p.replace(default=appdict[n], kind=p.KEYWORD_ONLY)
-                new_parameters.append(p)
+        # no parameter with a given value can survive this point
+        # otherwise defaulted ones would be evaluated twice
+        # and for ones already passed a value, we don't have an evaluable string for arbitrary values
+        # (reminder: ParameterInfo stores evaluable strings as default values for arguments)
 
         if extrakw:
             new_parameters.append(signature.parameters[extrakw])
