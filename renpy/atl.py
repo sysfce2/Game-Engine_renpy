@@ -438,8 +438,9 @@ class ATLTransformBase(renpy.object.Object):
             args = ()
 
         if "child" not in positional: # for backwards consistency
-        # if "child" not in signature.parameters: # not backwards-consistent, but makes more sense
             child = kwargs.pop("child", child)
+        # if ("child" in kwargs) and (("child" not in signature.parameters) or (signature.parameters["child"].kind=Parameter.POSITIONAL_ONLY)): # not backwards-consistent, but makes more sense
+        #     child = kwargs.pop("child")
 
         appdict = signature.apply(args=args, kwargs=kwargs, partial=True)
 
