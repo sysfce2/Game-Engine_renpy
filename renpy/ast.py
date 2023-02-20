@@ -189,18 +189,6 @@ class ParameterInfo(Signature):
     """
     __slots__ = ()
 
-    def __init__(self, parameters=None, *args_, **kwargs_):
-        if parameters:
-            pars = []
-            for p in parameters:
-                if p.default is p.empty:
-                    pass
-                elif not isinstance(p.default, str):
-                    raise TypeError("ParameterInfo takes strings or Parameter.empty. {!r} is not accepted.".format(p.default))
-                pars.append(p)
-            parameters = pars
-        super().__init__(parameters, *args_, **kwargs_)
-
     def _eval(self):
         """
         Returns a copy of self where the default values of the parameters
