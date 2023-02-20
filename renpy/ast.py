@@ -66,8 +66,6 @@ class Signature(inspect.Signature):
     """
     __slots__ = ()
 
-    # will certainly require a compated __setstate__, possibly by inheriting renpy.object.Object
-
     @classmethod
     def legacy(cls, parameters, positional, extrapos, extrakw, last_posonly=None, first_kwonly=None):
         """
@@ -87,6 +85,11 @@ class Signature(inspect.Signature):
         posonly_found = (last_posonly is None)
         now_kw_only = False
         elist = [] # TODO: remove before flight
+
+        # legacy² : long-time nonsense in atl.py
+        if (not parameters) and positional:
+            print("Legacy atl thing : {!r} positionals were not part of parameters".format(positional))
+            parameters = [(name, inspect.Parameter.empty) for name in positional]
 
         for name, default in parameters:
             if name == first_kwonly:
@@ -122,15 +125,15 @@ class Signature(inspect.Signature):
         return rv
 
     @classmethod
-    def from_legacy(cls, param_info):
+    def from_legacy_state(cls, param_info):
         """
-        Creates a ParameterInfo object from a legacy ParameterInfo object.
+        Creates a ParameterInfo object from the vars of a legacy ParameterInfo object.
         """
-        positional_only = param_info.positional_only
+        positional_only = param_info["positional_only"]
         last_posonly = positional_only[-1][0] if positional_only else None
-        keyword_only = param_info.keyword_only
+        keyword_only = param_info["keyword_only"]
         first_kwonly = keyword_only[0][0] if keyword_only else None
-        return cls.legacy(param_info.parameters, param_info.positional, param_info.extrapos, param_info.extrakw, last_posonly, first_kwonly)
+        return cls.legacy(param_info["parameters"], param_info["positional"], param_info["extrapos"], param_info["extrakw"], last_posonly, first_kwonly)
 
     @property
     def positional(self):
@@ -224,6 +227,31 @@ class ParameterInfo(Signature):
 
     def bind_partial(self, *args, **kwargs):
         return self._eval().bind_partial(*args, **kwargs)
+
+    # vaguely inspired by renpy.object.Object
+    __version__ = 1
+
+    def __reduce__(self):
+        # d should be empty, left in case Signature changes its __reduce__ in the future
+        a, b, c, *d = super().__reduce__()
+        c["__version__"] = self.__version__
+        return a, b, c, *d
+
+    def __setstate__(self, state):
+        version = state.pop("__version__", 0)
+
+        if version < 1:
+            parameters = []
+            for n, ds in state["parameters"]:
+                if ds is None:
+                    ds = inspect.Parameter.empty
+                parameters.append((n, ds))
+            state["parameters"] = parameters
+
+            self._parameters = self.from_legacy_state(state)._parameters
+            state = {"_return_annotation": self.empty}
+
+        super().__setstate__(state)
 
 def apply_arguments(parameters, args, kwargs, ignore_errors=False):
 
