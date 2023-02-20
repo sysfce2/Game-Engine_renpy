@@ -1035,9 +1035,6 @@ def transform_statement(l, loc):
 
     parameters = parse_parameters(l)
 
-    if parameters and (parameters.extrakw or parameters.extrapos):
-        l.error('transform statement does not take a variable number of parameters')
-
     l.require(':')
     l.expect_eol()
 
