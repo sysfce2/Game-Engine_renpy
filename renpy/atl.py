@@ -495,8 +495,7 @@ class ATLTransformBase(renpy.object.Object):
         # second, non-passed pos-or-kw parameters,
         # until (and not counting) the first one passed by keyword
         # unchanged, may have a default or not
-        for n, p in signature.parameters.items():
-            if p.kind is p.POSITIONAL_OR_KEYWORD:
+            elif p.kind is p.POSITIONAL_OR_KEYWORD:
                 if n in kwargs:
                     break
                 if n not in passedargs:
@@ -515,8 +514,7 @@ class ATLTransformBase(renpy.object.Object):
 
         # fifth, non-passed non-defaulted (=required) keyword-only parameters
         # unchanged
-        for n, p in signature.parameters.items():
-            if (p.kind is p.KEYWORD_ONLY) and (p.default is p.empty) and (n not in passedargs):
+            elif (p.kind is p.KEYWORD_ONLY) and (p.default is p.empty) and (n not in passedargs):
                 new_parameters[n] = p
 
         # sixth, non-passed defaulted pos-or-kw parameters
@@ -528,8 +526,7 @@ class ATLTransformBase(renpy.object.Object):
 
         # seventh, passed [pos-or-kw or defaulted kw-only] parameters
         # changed to kw-only, defaulted to evaluated value
-        for n, p in signature.parameters.items():
-            if ((p.kind is p.POSITIONAL_OR_KEYWORD) or (p.kind is p.KEYWORD_ONLY) and (p.default is not p.empty)) and (n in passedargs):
+            elif ((p.kind is p.POSITIONAL_OR_KEYWORD) or (p.kind is p.KEYWORD_ONLY) and (p.default is not p.empty)) and (n in passedargs):
                 new_parameters[n] = p.replace(kind=p.KEYWORD_ONLY, default=allargs[n])
 
         # eighth, the variadic keyword dict
