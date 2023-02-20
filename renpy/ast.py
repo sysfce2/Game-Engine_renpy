@@ -194,12 +194,6 @@ class ParameterInfo(inspect.Signature):
         The partial feature is new - will probably be useful in ATL.
         """
 
-        # because *some people* like to pass None as args or kwargs...
-        if args is None:
-            args = ()
-        if kwargs is None:
-            kwargs = renpy.python.RevertableDict()
-
         # argument default values are evaluated at call time
         evaled_signature = self._eval
         rv = None
@@ -232,6 +226,12 @@ def apply_arguments(parameters, args, kwargs, ignore_errors=False):
             raise Exception("Arguments supplied, but parameter list not present")
         else:
             return { }
+
+    # because Label.execute likes to pass None as args or kwargs...
+    if args is None:
+        args = ()
+    if kwargs is None:
+        kwargs = {} # TODO: maybe {} is enough
 
     return parameters.apply(args, kwargs, ignore_errors)
 
