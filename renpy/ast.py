@@ -193,12 +193,10 @@ class ParameterInfo(Signature):
         if parameters:
             pars = []
             for p in parameters:
-                if p.default is None:
-                    p = p.replace(default=p.empty)
-                elif p.default is p.empty:
+                if p.default is p.empty:
                     pass
                 elif not isinstance(p.default, str):
-                    raise TypeError("ParameterInfo takes strings or Parameter.empty, and accepts None. {!r} is not accepted.".format(p.default))
+                    raise TypeError("ParameterInfo takes strings or Parameter.empty. {!r} is not accepted.".format(p.default))
                 pars.append(p)
             parameters = pars
         super().__init__(parameters, *args_, **kwargs_)
@@ -251,7 +249,7 @@ def apply_arguments(parameters, args, kwargs, ignore_errors=False):
     if args is None:
         args = ()
     if kwargs is None:
-        kwargs = {} # TODO: maybe {} is enough
+        kwargs = {}
 
     return parameters.apply(args, kwargs, ignore_errors)
 
