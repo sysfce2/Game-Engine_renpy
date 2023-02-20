@@ -87,16 +87,16 @@ class ParameterInfo(inspect.Signature):
 
         pars = []
         posonly_found = (last_posonly is None)
-        kw_only_now = False
+        now_kw_only = False
         elist = [] # TODO: remove before flight
 
         for name, default in parameters:
             if name == first_kwonly:
-                kw_only_now = True
+                now_kw_only = True
                 if extrapos is not None:
                     pars.append(inspect.Parameter(extrapos, inspect.Parameter.VAR_POSITIONAL))
 
-            if kw_only_now:
+            if now_kw_only:
                 kind = inspect.Parameter.KEYWORD_ONLY
             elif not posonly_found:
                 kind = inspect.Parameter.POSITIONAL_ONLY
@@ -116,13 +116,13 @@ class ParameterInfo(inspect.Signature):
             if name == last_posonly:
                 posonly_found = True
 
-        if (not kw_only_now) and (extrapos is not None):
+        if (not now_kw_only) and (extrapos is not None):
             pars.append(inspect.Parameter(extrapos, inspect.Parameter.VAR_POSITIONAL))
 
         if extrakw is not None:
             pars.append(inspect.Parameter(extrakw, inspect.Parameter.VAR_KEYWORD))
 
-        rv = cls(pars) # let the constructor raise errors if it finds any
+        rv = cls(pars) # let the constructor raise errors before ours, if it finds any
         if elist:
             raise ExceptionGroup("Had some problems with parameters", elist) # TODO: remove before flight
         return rv
