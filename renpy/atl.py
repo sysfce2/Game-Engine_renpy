@@ -422,49 +422,44 @@ class ATLTransformBase(renpy.object.Object):
 
         context = self.context.context.copy()
 
-        for k, v in self.parameters.parameters.items():
-            if v.default is not v.empty:
-                context[k] = renpy.python.py_eval(v.default)
-
-        positional = list(self.parameters.positional)
-        args = list(args)
-
         child = None
 
+        signature = self.parameters
+        positional = signature.positional
+        extrapos = signature.extrapos
+        extrakw = signature.extrakw
+
         if not positional and args:
-            child = args.pop(0)
+            try:
+                child, = args
+            except Exception:
+                raise Exception("Too many arguments passed to ATL transform : {!r} are extraneous.".format(args))
 
-        # Handle positional arguments.
-        while positional and args:
-            name = positional.pop(0)
-            value = args.pop(0)
+            args = ()
 
-            if name in kwargs:
-                raise Exception('Parameter %r is used as both a positional and keyword argument to a transition.' % name)
+        if "child" not in positional: # for backwards consistency
+        # if "child" not in signature.parameters: # not backwards-consistent, but makes more sense
+            child = kwargs.pop("child", child)
 
-            if (name == "child") or (name == "old_widget"):
-                child = value
+        appdict = signature.apply(args=args, kwargs=kwargs, partial=True)
 
-            context[name] = value
+        if child is None: # for backwards consistency
+            for k, v in appdict.items(): # first set, first served : legacy behavior
+                if k == "child":
+                    if "child" not in positional: # for backwards consistency
+                        child = v
+                elif k == "old_widget":
+                    child = v
 
-        if args:
-            raise Exception("Too many arguments passed to ATL transform.")
+        if extrapos:
+            context.setdefault(extrapos, ())
+            context[extrapos] += appdict.pop(extrapos, ())
 
-        # Handle keyword arguments.
-        for k, v in kwargs.items():
+        if extrakw:
+            context.setdefault(extrakw, renpy.revertable.RevertableDict())
+            context[extrakw].update(appdict.pop(extrakw, {}))
 
-            if k == "old_widget":
-                child = v
-
-            if k in positional:
-                positional.remove(k)
-                context[k] = v
-            elif k in context:
-                context[k] = v
-            elif k == 'child':
-                child = v
-            else:
-                raise Exception('Parameter %r is not known by ATL Transform.' % k)
+        context.update(appdict)
 
         if child is None:
             child = self.child
@@ -473,14 +468,37 @@ class ATLTransformBase(renpy.object.Object):
             child = child._duplicate(_args)
 
         # Create a new ATL Transform.
-        parameters = renpy.ast.ParameterInfo.legacy([ ], positional, None, None)
+        new_parameters = []
+        for n in positional:
+            if n not in appdict:
+                new_parameters.append(signature.parameters[n])
+
+        if extrapos:
+            new_parameters.append(signature.parameters[extrapos])
+
+        for n, p in signature.parameters.items():
+            # keyword-only required arguments go first
+            if p.kind == p.KEYWORD_ONLY and (n not in appdict):
+                new_parameters.append(p)
+
+        for n, p in signature.parameters.items():
+            # arguments having a value (either the default one or one passed by argument) go next
+            if (n in appdict) and (p.kind not in (p.VAR_POSITIONAL, p.VAR_KEYWORD)):
+                # their new default is the value - whether it was the former default or not
+                p = p.replace(default=appdict[n], kind=p.KEYWORD_ONLY)
+                new_parameters.append(p)
+
+        if extrakw:
+            new_parameters.append(signature.parameters[extrakw])
+
+        new_signature = renpy.ast.ParameterInfo(new_parameters)
 
         rv = renpy.display.motion.ATLTransform(
             atl=self.atl,
             child=child,
             style=self.style_arg, # type: ignore
             context=context,
-            parameters=parameters,
+            parameters=new_signature,
             _args=_args,
             )
 
