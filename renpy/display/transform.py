@@ -944,7 +944,7 @@ class ATLTransform(renpy.atl.ATLTransformBase, Transform):
 
 
     def _repr_info(self):
-        return repr((self.child, self.atl.loc))
+        return "({!r}, {!s}, {!r})".format(self.child, self.parameters, self.atl.loc)
 
 
 # Names of transform properties, and if the property should be handled with
