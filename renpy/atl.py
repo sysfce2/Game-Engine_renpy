@@ -442,6 +442,8 @@ class ATLTransformBase(renpy.object.Object):
         # if ("child" in kwargs) and (("child" not in signature.parameters) or (signature.parameters["child"].kind=Parameter.POSITIONAL_ONLY)): # not backwards-consistent, but makes more sense
         #     child = kwargs.pop("child")
 
+        signature = getattr(signature, "eval", signature)
+
         boundargs = signature.bind_partial(*args, **kwargs) # inspect.BoundArguments object
         passedargs = boundargs.arguments # dict of the resolved values passed to the function (used to know what was passed or not)
         boundargs.apply_defaults()
@@ -471,18 +473,6 @@ class ATLTransformBase(renpy.object.Object):
         if getattr(child, '_duplicatable', False):
             child = child._duplicate(_args)
 
-        if isinstance(signature, renpy.ast.ParameterInfo):
-            def good_default(p):
-                """
-                Returns the parameter with its default evaluated, if not empty.
-                """
-                if p.default is not p.empty:
-                    return p.replace(default=allargs[p.name])
-                else:
-                    return p
-        else:
-            good_default = lambda p: p
-
         # Create a new ATL Transform.
         new_parameters = {}
 
@@ -490,7 +480,7 @@ class ATLTransformBase(renpy.object.Object):
         # unchanged, may have a default or not
         for n, p in signature.parameters.items():
             if (p.kind is p.POSITIONAL_ONLY) and (n not in passedargs):
-                new_parameters[n] = good_default(p)
+                new_parameters[n] = p
 
         # second, non-passed pos-or-kw parameters,
         # until (and not counting) the first one passed by keyword
@@ -499,7 +489,7 @@ class ATLTransformBase(renpy.object.Object):
                 if n in kwargs:
                     break
                 if n not in passedargs:
-                    new_parameters[n] = good_default(p)
+                    new_parameters[n] = p
 
         # third, the variadic positional tuple (yes)
         if extrapos:
@@ -522,7 +512,7 @@ class ATLTransformBase(renpy.object.Object):
         # changed to kw-only
         for n, p in signature.parameters.items():
             if (p.kind is p.POSITIONAL_OR_KEYWORD) and (p.default is not p.empty) and (n not in passedargs) and (n not in new_parameters):
-                new_parameters[n] = good_default(p).replace(kind=p.KEYWORD_ONLY)
+                new_parameters[n] = p.replace(kind=p.KEYWORD_ONLY)
 
         # seventh, passed [pos-or-kw or defaulted kw-only] parameters
         # changed to kw-only, defaulted to evaluated value

@@ -192,7 +192,8 @@ class ParameterInfo(Signature):
     """
     __slots__ = ()
 
-    def _eval(self):
+    @property
+    def eval(self):
         """
         Returns a copy of self where the default values of the parameters
         are the actual values and not the strings that eval to them.
@@ -220,13 +221,13 @@ class ParameterInfo(Signature):
         This method still exists so that when ignore_errors, the parameters aren't evaluated twice.
         """
 
-        return self._eval().apply(*args_, **kwargs_)
+        return self.eval.apply(*args_, **kwargs_)
 
     def bind(self, *args, **kwargs):
-        return self._eval().bind(*args, **kwargs)
+        return self.eval.bind(*args, **kwargs)
 
     def bind_partial(self, *args, **kwargs):
-        return self._eval().bind_partial(*args, **kwargs)
+        return self.eval.bind_partial(*args, **kwargs)
 
     # vaguely inspired by renpy.object.Object
     __version__ = 1
