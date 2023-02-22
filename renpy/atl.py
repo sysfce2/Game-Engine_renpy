@@ -439,8 +439,6 @@ class ATLTransformBase(renpy.object.Object):
 
         if "child" not in positional: # for backwards consistency
             child = kwargs.pop("child", child)
-        # if ("child" in kwargs) and (("child" not in signature.parameters) or (signature.parameters["child"].kind=Parameter.POSITIONAL_ONLY)): # not backwards-consistent, but makes more sense
-        #     child = kwargs.pop("child")
 
         signature = getattr(signature, "eval", signature)
 
@@ -473,57 +471,7 @@ class ATLTransformBase(renpy.object.Object):
         if getattr(child, '_duplicatable', False):
             child = child._duplicate(_args)
 
-        # Create a new ATL Transform.
-        new_parameters = {}
-
-        # first, non-passed pos-only parameters
-        # unchanged, may have a default or not
-        for n, p in signature.parameters.items():
-            if (p.kind is p.POSITIONAL_ONLY) and (n not in passedargs):
-                new_parameters[n] = p
-
-        # second, non-passed pos-or-kw parameters,
-        # until (and not counting) the first one passed by keyword
-        # unchanged, may have a default or not
-            elif p.kind is p.POSITIONAL_OR_KEYWORD:
-                if n in kwargs:
-                    break
-                if n not in passedargs:
-                    new_parameters[n] = p
-
-        # third, the variadic positional tuple (yes)
-        if extrapos:
-            new_parameters[extrapos] = signature.parameters[extrapos]
-
-        # fourth, non-passed non-defaulted (=required) pos-or-kw parameters
-        # only the ones not already added (at step 2)
-        # changed to kw-only
-        for n, p in signature.parameters.items():
-            if (p.kind is p.POSITIONAL_OR_KEYWORD) and (p.default is p.empty) and (n not in passedargs) and (n not in new_parameters):
-                new_parameters[n] = p.replace(kind=p.KEYWORD_ONLY)
-
-        # fifth, non-passed non-defaulted (=required) keyword-only parameters
-        # unchanged
-            elif (p.kind is p.KEYWORD_ONLY) and (p.default is p.empty) and (n not in passedargs):
-                new_parameters[n] = p
-
-        # sixth, non-passed defaulted pos-or-kw parameters
-        # only the ones not already added (at step 2)
-        # changed to kw-only
-        for n, p in signature.parameters.items():
-            if (p.kind is p.POSITIONAL_OR_KEYWORD) and (p.default is not p.empty) and (n not in passedargs) and (n not in new_parameters):
-                new_parameters[n] = p.replace(kind=p.KEYWORD_ONLY)
-
-        # seventh, passed [pos-or-kw or defaulted kw-only] parameters
-        # changed to kw-only, defaulted to evaluated value
-            elif ((p.kind is p.POSITIONAL_OR_KEYWORD) or (p.kind is p.KEYWORD_ONLY) and (p.default is not p.empty)) and (n in passedargs):
-                new_parameters[n] = p.replace(kind=p.KEYWORD_ONLY, default=passedargs[n])
-
-        # eighth, the variadic keyword dict
-        if extrakw:
-            new_parameters[extrakw] = signature.parameters[extrakw]
-
-        new_signature = renpy.ast.Signature(tuple(new_parameters.values()))
+        new_signature = renpy.curry.atl_partial_signature(signature, passedargs)
 
         rv = renpy.display.motion.ATLTransform(
             atl=self.atl,
