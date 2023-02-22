@@ -429,6 +429,7 @@ class ATLTransformBase(renpy.object.Object):
         extrapos = signature.extrapos
         extrakw = signature.extrakw
 
+        # child pass 1
         if args and not positional:
             try:
                 child, = args
@@ -437,8 +438,30 @@ class ATLTransformBase(renpy.object.Object):
 
             args = ()
 
-        if "child" not in positional: # for backwards consistency
-            child = kwargs.pop("child", child)
+        lenargs = len(args)
+
+        # child pass 2 (2c and 2ow)
+        for i, pname in enumerate(positional[:lenargs]):
+            if pname in ("child", "old_widget"):
+                child = args[i]
+
+        # child pass 3 (3c and 3ow)
+        for k in kwargs:
+            if k in ("child", "old_widget"):
+                child = kwargs[k]
+
+                # in purpose, tests whether passing that by kwargs is valid
+                # that condition needs to be adapted to the possible existence of extrakw
+                # and to the fact that context does not contain the defaulted params' values anymore
+                # and to the existence of pos-only parameters (which don't take kwargs)
+                if (k not in context) and (k not in positional[lenargs:]):
+                    # that would raise if we don't remove the kwarg
+                    if k == "child":
+                        kwargs.pop("child")
+                # the "child" kwarg is read iff it WOULD raise
+                # the "old_widget" only works iff it would NOT raise
+                    # (since when it does, it doesn't matter what we set as the child)
+                # the two are not mutually exclusive though
 
         signature = getattr(signature, "eval", signature)
 
@@ -446,14 +469,6 @@ class ATLTransformBase(renpy.object.Object):
         passedargs = boundargs.arguments # dict of the resolved values passed to the function (used to know what was passed or not)
         boundargs.apply_defaults()
         allargs = boundargs.arguments # same, but with the default values applied (used to update the context)
-
-        if child is None: # for backwards consistency
-            for k, v in passedargs.items(): # last set survives : legacy behavior
-                if k == "child":
-                    if "child" not in positional: # for backwards consistency
-                        child = v
-                elif k == "old_widget":
-                    child = v
 
         if extrapos:
             context.setdefault(extrapos, ())
