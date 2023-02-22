@@ -438,15 +438,15 @@ class ATLTransformBase(renpy.object.Object):
 
             args = ()
 
+        # child pass 2 (2c and 2ow)
+        for pname, val in zip(positional, args):
+            if pname in ("child", "old_widget"):
+                child = val
+
         lenargs = len(args)
 
-        # child pass 2 (2c and 2ow)
-        for i, pname in enumerate(positional[:lenargs]):
-            if pname in ("child", "old_widget"):
-                child = args[i]
-
         # child pass 3 (3c and 3ow)
-        for k in kwargs:
+        for k in kwargs: # have to do it that way so that the last match overrides the former ones (legacy)
             if k in ("child", "old_widget"):
                 child = kwargs[k]
 
