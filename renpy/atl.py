@@ -429,11 +429,11 @@ class ATLTransformBase(renpy.object.Object):
         extrapos = signature.extrapos
         extrakw = signature.extrakw
 
-        if not positional and args:
+        if args and not positional:
             try:
                 child, = args
             except Exception:
-                raise Exception("Too many arguments passed to ATL transform : {!r} are extraneous.".format(args))
+                pass # will fail at bind_partial with a prettier error
 
             args = ()
 
@@ -450,7 +450,7 @@ class ATLTransformBase(renpy.object.Object):
         allargs = boundargs.arguments # same, but with the default values applied (used to update the context)
 
         if child is None: # for backwards consistency
-            for k, v in allargs.items(): # last set survives : legacy behavior
+            for k, v in passedargs.items(): # last set survives : legacy behavior
                 if k == "child":
                     if "child" not in positional: # for backwards consistency
                         child = v
@@ -459,11 +459,11 @@ class ATLTransformBase(renpy.object.Object):
 
         if extrapos:
             context.setdefault(extrapos, ())
-            context[extrapos] += allargs.pop(extrapos, ())
+            context[extrapos] += allargs.pop(extrapos)
 
         if extrakw:
             context.setdefault(extrakw, renpy.revertable.RevertableDict())
-            context[extrakw].update(allargs.pop(extrakw, {}))
+            context[extrakw] |= allargs.pop(extrakw)
 
         context.update(allargs)
 
@@ -517,7 +517,7 @@ class ATLTransformBase(renpy.object.Object):
         # seventh, passed [pos-or-kw or defaulted kw-only] parameters
         # changed to kw-only, defaulted to evaluated value
             elif ((p.kind is p.POSITIONAL_OR_KEYWORD) or (p.kind is p.KEYWORD_ONLY) and (p.default is not p.empty)) and (n in passedargs):
-                new_parameters[n] = p.replace(kind=p.KEYWORD_ONLY, default=allargs[n])
+                new_parameters[n] = p.replace(kind=p.KEYWORD_ONLY, default=passedargs[n])
 
         # eighth, the variadic keyword dict
         if extrakw:
