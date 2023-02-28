@@ -195,8 +195,6 @@ def atl_partial_signature(signature, passed_parameters,
         else:
             new_parameters.append(param)
 
-    # relies on the kinds to be an ordered IntEnum, and on .sort to be stable
-    new_parameters.sort(key=lambda param: (param.kind.value, bool(param.default is not param.empty)))
+    new_parameters.sort(key=lambda param: (param.kind, bool(param.default is not param.empty)))
 
     return signature.replace(parameters=new_parameters)
-
