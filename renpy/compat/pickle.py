@@ -24,6 +24,7 @@ from renpy.compat import PY2, basestring, bchr, bord, chr, open, pystr, range, r
 
 
 import renpy
+from collections.abc import Callable
 import pickle
 import io
 
@@ -78,23 +79,28 @@ else:
         return cls.__new__(cls, *args, **kwargs)
 
     class Unpickler(pickle.Unpickler):
-        date = functools.partial(make_datetime, datetime.date)
-        time = functools.partial(make_datetime, datetime.time)
-        datetime = functools.partial(make_datetime, datetime.datetime)
+        registry = {
+            ("datetime", "date"): functools.partial(make_datetime, datetime.date),
+            ("datetime", "time"): functools.partial(make_datetime, datetime.time),
+            ("datetime", "datetime"): functools.partial(make_datetime, datetime.datetime),
+        } # type: dict[tuple[str, str], Callable]
 
         def find_class(self, module, name):
-            if module == "datetime":
-                if name == "date":
-                    return self.date
-                elif name == "time":
-                    return self.time
-                elif name == "datetime":
-                    return self.datetime
-
-            if module == "_ast" and name in REWRITE_NODES:
-                return REWRITE_NODES[name]
-
+            rv = self.registry.get((module, name), None)
+            if rv is not None:
+                return rv
             return super().find_class(module, name)
+
+        @classmethod
+        def compat_pickle_alias(cls, module_name, clbl_name=None): # type: (str, str|None) -> Callable[[Callable], Callable]
+            if not isinstance(module_name, str):
+                raise TypeError("Use the decorator with parameters.")
+
+            def decorator(clbl): # type: (Callable) -> Callable
+                cls.registry[module_name, clbl_name or clbl.__name__] = clbl
+                return clbl
+
+            return decorator
 
     def load(f):
         up = Unpickler(f, fix_imports=True, encoding="utf-8", errors="surrogateescape")
@@ -120,7 +126,6 @@ else:
     # Note: this isn't a complete python 2 -> python 3 ast conversion, we just convert
     # what is needed to still support old-style screens (Ren'py 6.17 and below)
     # mapping of "classname": WrapperClass
-    REWRITE_NODES = {}
 
     # NodeTransformer that runs after the ast has been instantiated in the ast.Module
     # handler, and allows us to fix some more difficult issues. Currently only
@@ -149,6 +154,7 @@ else:
     # py2 class, and __reduce__ implemented to convert to the underlying py3 class
     # if it gets repickled. Note that py3 ast classes will not hit the REWRITE_NODES check
     # as py3 classes report to be from "ast" instead of "_ast"
+    @Unpickler.compat_pickle_alias("_ast", "Call")
     class CallWrapper(ast.Call):
         def __reduce__(self):
             _, args, attrs = super().__reduce__()
@@ -183,8 +189,7 @@ else:
                 node.col_offset = self.col_offset
                 self.keywords.append(node)
 
-    REWRITE_NODES["Call"] = CallWrapper
-
+    @Unpickler.compat_pickle_alias("_ast", "Num")
     class NumWrapper(ast.Constant):
         def __reduce__(self):
             _, args, attrs = super().__reduce__()
@@ -198,8 +203,7 @@ else:
             # contents
             self.value = state["n"]
 
-    REWRITE_NODES["Num"] = NumWrapper
-
+    @Unpickler.compat_pickle_alias("_ast", "Str")
     class StrWrapper(ast.Constant):
         def __reduce__(self):
             _, args, attrs = super().__reduce__()
@@ -213,8 +217,7 @@ else:
             # contents
             self.value = state["s"]
 
-    REWRITE_NODES["Str"] = StrWrapper
-
+    @Unpickler.compat_pickle_alias("_ast", "Module")
     class ModuleWrapper(ast.Module):
         def __reduce__(self):
             _, args, attrs = super().__reduce__()
@@ -231,8 +234,7 @@ else:
             transformer = AstFixupTransformer()
             transformer.visit(self)
 
-    REWRITE_NODES["Module"] = ModuleWrapper
-
+    @Unpickler.compat_pickle_alias("_ast", "Repr")
     class ReprWrapper(ast.Call):
         def __reduce__(self):
             _, args, attrs = super().__reduce__()
@@ -249,8 +251,7 @@ else:
             self.args = [state["value"]]
             self.keywords = []
 
-    REWRITE_NODES["Repr"] = ReprWrapper
-
+    @Unpickler.compat_pickle_alias("_ast", "arguments")
     class ArgumentsWrapper(ast.arguments):
         def __reduce__(self):
             _, args, attrs = super().__reduce__()
@@ -276,11 +277,8 @@ else:
             self.kwarg = ast.arg(state["kwarg"], lineno=1, col_offset=0)
             self.defaults =  state["defaults"]
 
-    REWRITE_NODES["arguments"] = ArgumentsWrapper
-
+    @Unpickler.compat_pickle_alias("_ast", "Param")
     class ParamWrapper(ast.Load):
         def __reduce__(self):
             _, args, attrs = super().__reduce__()
             return ast.Load, args, attrs
-
-    REWRITE_NODES["Param"] = ParamWrapper
