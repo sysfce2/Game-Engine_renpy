@@ -13,6 +13,14 @@ Incompatible changes to the GUI are documented at :ref:`gui-changes`, as
 such changes only take effect when the GUI is regenerated.
 
 
+.. _incompatible-8.5.3:
+
+8.5.3
+-----
+
+**Live2D** Ren'Py now supports and requires Live2D 5.3. You may need to update Live2D to continue to use it in Ren'Py 5.3.
+
+
 .. _incompatible-8.5.0:
 
 8.5.0
