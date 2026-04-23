@@ -13,7 +13,7 @@ Changelog (Ren'Py 7.x-)
 Dependency Updates
 ------------------
 
-Ren'Py now supports and requires Live2D 5.3. You may need to update Live2D to continue to use it in Ren'Py 5.3.
+Ren'Py now supports and requires Live2D 5.3. You may need to update Live2D to continue to use it in Ren'Py 8.5.3 or later.
 
 
 Ren'Py Stores as Python Packages
