@@ -971,6 +971,9 @@ class Say(Node):
             if renpy.config.say_menu_text_filter:
                 what = renpy.config.say_menu_text_filter(what)
 
+            for f in renpy.config.say_menu_text_filters:
+                what = f(what)
+
             renpy.store._last_raw_what = what
 
             if self.arguments is not None:
@@ -1016,6 +1019,9 @@ class Say(Node):
             what = self.what
             if renpy.config.say_menu_text_filter:
                 what = renpy.config.say_menu_text_filter(what)
+
+            for f in renpy.config.say_menu_text_filters:
+                what = f(what)
 
             renpy.exports.predict_say(who, what)
 
@@ -1786,6 +1792,9 @@ class Menu(Node):
         for i, (label, condition, block) in enumerate(self.items):
             if renpy.config.say_menu_text_filter:
                 label = renpy.config.say_menu_text_filter(label)
+
+            for f in renpy.config.say_menu_text_filters:
+                label = f(label)
 
             has_item = False
 
