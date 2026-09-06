@@ -458,6 +458,9 @@ expensive_predict_callbacks = []
 # Should screens be predicted?
 predict_screens = True
 
+# Should shaders be predicted?
+predict_shaders = True
+
 # Should we use the new choice screen format?
 choice_screen_chosen = True
 
@@ -799,7 +802,7 @@ enable_language_autodetect = False
 locale_to_language_function = None
 
 # The table used by the default locale_to_language_function.
-locale_to_language_map: dict[str, str] = { }
+locale_to_language_map: dict[str, str] = {}
 
 # Should we pass the full argument list to the say screen?
 old_say_args = False
@@ -1182,6 +1185,11 @@ log_gl_extensions = False
 
 # Should GL shaders be logged to log.txt
 log_gl_shaders = False
+
+# The GLSL dialect shader parts are written in when they don't pass glsl to
+# renpy.register_shader. 300 selects GLSL ES 3.00 and 100 selects GLSL ES
+# 1.00. Games declaring compatibility with 8.5 or earlier get 100.
+glsl_version = 300
 
 # OpenGL Blend Funcs
 gl_blend_func = {}
@@ -1600,7 +1608,7 @@ mesh_oversample: float = 8.0
 Determines how much mesh textures can be oversampled by. This, in turn, controls the maximum amount a mesh can be scaled up by before it introduces additional blurriness.
 """
 
-emscripten_preload_timeout: float|None = 5.0
+emscripten_preload_timeout: float | None = 5.0
 """
 After this many second without being able to preload, the emscripten port will cause a preload even if doing
 so might cause a framerate stutter.
@@ -1643,7 +1651,7 @@ If True, the xmaximum and ymaximum properties can increase the space offered of 
 is offered by its container.
 """
 
-extend_like_characters: set[str] = { "extend" }
+extend_like_characters: set[str] = {"extend"}
 """
 A set of character names that will be treated like the "extend" character for the purpose of dialogue export.
 """
@@ -1664,13 +1672,13 @@ If True, live2d will use the old Bezier curve behavior, which usees easing. If F
 of beziers is used.
 """
 
-special_directory_map: dict[str, list[str]] = { 'images' : [ 'images' ], 'audio' : [ 'audio' ], 'fonts' : [ 'fonts' ] }
+special_directory_map: dict[str, list[str]] = {"images": ["images"], "audio": ["audio"], "fonts": ["fonts"]}
 """
 This maps the special directory names ('images', 'audio', 'fonts') to a list of directories that will
 be searched for that kind of file.
 """
 
-font_size_adjust: dict[str, float|Callable[[str, float], float]] = {}
+font_size_adjust: dict[str, float | Callable[[str, float], float]] = {}
 """
 A map from font name to a multiplier or function that's used to adjust the size of a font.
 """
@@ -1679,6 +1687,35 @@ scene_uses_tag_layer: bool = True
 """
 If True, the scene statement will use the tag layer if a tag is known.
 """
+
+renamed_files: dict[str, str] = {
+    "dejavusans.ttf": "dejavusans.woff2",
+    "dejavusans-bold.ttf": "dejavusans-bold.woff2",
+    "twemojicolrv0.ttf": "twemojicolrv0.woff2",
+    "_opendyslexic3-regular.ttf": "_opendyslexic3-regular.woff2",
+}
+"""
+A map from file names to new file names. This is used to handle files that have been renamed. The keys must be
+lower-case.
+"""
+
+windows_high_pixel_density: bool = bool(int(os.environ.get("RENPY_WINDOWS_HIGH_PIXEL_DENSITY", "1")))
+"""
+If true, Ren'Py will attempt to enable SDL3 high pixel densitiy on Windows. If false, it will not.
+"""
+
+after_init_callbacks: list[Callable[[], None]] = []
+"""
+A list of callbacks that are called at the very end of the init phase, before the game starts normal execution for the
+first time. These are run just after defaults are set up, but only once, and before script statements are run.
+"""
+
+minimum_prediction_time: float = 0.001
+"""
+The minimum amount of time Ren'Py will spend on predicting images even if there is a
+frame to be drawn.
+"""
+
 
 del os
 del collections
@@ -1732,5 +1769,5 @@ def post_init():
     if renpy.config.raise_image_exceptions is None:
         renpy.config.raise_image_exceptions = renpy.config.developer
 
-    if renpy.config.raise_image_load_exceptions:
+    if renpy.config.raise_image_load_exceptions is None:
         renpy.config.raise_image_load_exceptions = renpy.config.developer

@@ -8,6 +8,36 @@ export RENPY_CYTHON=cython
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 QUIET=${RENPY_QUIET- --quiet}
+BUILD_ONLY=false
+CLEAN=false
+
+while [ "$#" -gt 0 ]; do
+    case "$1" in
+        --build)
+            BUILD_ONLY=true
+            shift
+            ;;
+        --clean)
+            CLEAN=true
+            shift
+            ;;
+        --)
+            shift
+            break
+            ;;
+        -*)
+            break
+            ;;
+        *)
+            break
+            ;;
+    esac
+done
+
+if $CLEAN; then
+    find "$ROOT" -maxdepth 1 -type f -name '*.cpython*.so' -delete
+    find "$ROOT/renpy" -type f -name '*.cpython*.so' -delete
+fi
 
 if [ -n "$RENPY_COVERAGE" ]; then
     variant="renpy-coverage"
@@ -53,16 +83,14 @@ setup () {
 if [ -e "$ROOT/cubism" ]; then
     export CUBISM="$ROOT/cubism"
     export CUBISM_PLATFORM=${CUBISM_PLATFORM:-linux/x86_64}
-    export LD_LIBRARY_PATH="$CUBISM/Core/dll/$CUBISM_PLATFORM"
+    export LD_LIBRARY_PATH="$CUBISM/Core/dll/$CUBISM_PLATFORM:${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
 fi
 
 setup "$ROOT/"
 
-python "$ROOT/distribute.py" --link-directories
-
-if  [ "$1" = "--build" ] ; then
+if $BUILD_ONLY; then
     echo "Ren'Py build complete."
     exit 0
 else
-    exec $RENPY_GDB python $ROOT/renpy.py "$@"
+    exec $RENPY_GDB python -X utf8 $ROOT/renpy.py "$@"
 fi

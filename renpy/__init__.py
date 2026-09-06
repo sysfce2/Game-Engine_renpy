@@ -407,6 +407,7 @@ def import_all():
     import renpy.curry
     import renpy.color
     import renpy.easy
+    import renpy.ecsign
     import renpy.encryption
     import renpy.execution
     import renpy.lexer
@@ -554,8 +555,10 @@ def import_all():
     import renpy.test.testkey
     import renpy.test.testast
     import renpy.test.testparser
+    import renpy.test.testfilter
     import renpy.test.testreporter
     import renpy.test.testexecution
+    import renpy.test.testcli
 
     import renpy.update
     import renpy.update.deferred
@@ -712,6 +715,7 @@ if typing.TYPE_CHECKING:
     from . import display as display
     from . import dump as dump
     from . import easy as easy
+    from . import ecsign as ecsign
     from . import editor as editor
     from . import encryption as encryption
     from . import error as error

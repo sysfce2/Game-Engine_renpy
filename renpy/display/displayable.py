@@ -27,6 +27,7 @@ import renpy
 
 type Placement = tuple[float | None, float | None, float | None, float | None, float | None, float | None, bool]
 
+
 def place(width: float, height: float, sw: float, sh: float, placement: Placement) -> tuple[float, float]:
     """
     Performs the Ren'Py placement algorithm.
@@ -484,6 +485,20 @@ class Displayable(renpy.object.Object):
         """
 
         return
+
+    def predict_shaders(self, shaders):
+        """
+        Called to predict shader combinations used by this displayable.
+        """
+
+        children = [d for d in self.visit() if d is not None]
+
+        if children:
+            return [(d, shaders) for d in children]
+
+        renpy.gl2.gl2shadercache.predict_shader(shaders + ("renpy.texture",))
+
+        return []
 
     def predict_one_action(self):
         """

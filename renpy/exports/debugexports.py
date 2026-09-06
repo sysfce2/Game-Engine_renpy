@@ -47,6 +47,7 @@ filename_line_override_stack: list[tuple[str, int]] = []
 A stack of filename/line override pairs.
 """
 
+
 @contextlib.contextmanager
 def filename_line_override(filename: str, line: int):
     """
@@ -163,7 +164,7 @@ def error(msg):
     """
     :doc: lint
 
-    Reports `msg`, a string, as as error for the user. This is logged as a
+    Reports `msg`, a string, as an error for the user. This is logged as a
     parse or lint error when approprate, and otherwise it is raised as an
     exception.
     """

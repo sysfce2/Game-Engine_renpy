@@ -64,7 +64,7 @@ def report(msg, *args):
     else:
         out = ""
 
-    out += msg % args
+    out += (msg % args) if args else msg
     print("")
     print(out)
 
@@ -188,6 +188,9 @@ def try_compile(where, expr, additional=None):
         If given, an additional line of information that is added to the
         error message.
     """
+
+    if expr is None:
+        return
 
     try:
         renpy.python.py_compile(expr, "eval")
@@ -1014,7 +1017,6 @@ def check_unreachables(all_nodes):
 
                 if node in unreachable:
                     to_check.append(node)
-
 
         elif isinstance(node, Testcase):
             weakly_reachable.add(node)

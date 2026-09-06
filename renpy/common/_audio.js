@@ -1,4 +1,4 @@
-﻿/* Copyright 2004-2025 Tom Rothamel <pytom@bishoujo.us>
+﻿/* Copyright 2004-2026 Tom Rothamel <pytom@bishoujo.us>
  *
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation files
@@ -85,11 +85,24 @@ let interpolate = (a, b, done) => {
 }
 
 /**
+ * Coerces `value` to a finite number, falling back to `dflt`.
+ */
+let finite = (value, dflt) => {
+    value = Number(value);
+    return Number.isFinite(value) ? value : dflt;
+}
+
+/**
  * Given an audio parameter, linearly ramps it from start to end over
  * duration seconds.
  */
 let linearRampToValue = (param, start, end, duration) => {
     param.cancelScheduledValues(context.currentTime);
+
+    // Guard against non-finite inputs.
+    start = finite(start, param.value);
+    end = finite(end, param.value);
+    duration = Math.max(0, finite(duration, 0));
 
     let points = 30;
 
@@ -103,8 +116,21 @@ let linearRampToValue = (param, start, end, duration) => {
  * Given an audio parameter, sets it to the given value.
  */
 let setValue = (param, value) => {
+    value = finite(value, param.value);
     param.cancelScheduledValues(context.currentTime);
     param.setValueAtTime(value, context.currentTime);
+}
+
+/**
+ * Creates a buffer source for the play object `p` on channel `c`, wiring
+ * up an `onended` handler that knows which source it belongs to.
+ */
+let create_source = (c, buffer) => {
+    let source = context.createBufferSource();
+    source.buffer = buffer;
+    source.started = false;
+    source.onended = () => { on_end(c, source); };
+    return source;
 }
 
 /**
@@ -123,6 +149,10 @@ let start_playing = (c) => {
     }
 
     if (p.source === null) {
+        return;
+    }
+
+    if (p.source.started) {
         return;
     }
 
@@ -146,7 +176,9 @@ let start_playing = (c) => {
         }
     }
 
-    if (p.end >= 0) {
+    p.source.started = true;
+
+    if (p.end > 0 && p.end > p.start) {
         p.source.start(0, p.start, p.end - p.start);
     } else {
         p.source.start(0, p.start);
@@ -161,7 +193,7 @@ let start_playing = (c) => {
 
     }
 
-    setValue(c.relative_volume.gain, p.relative_volume);
+    setValue(c.relative_volume.gain, finite(p.relative_volume, 1.0));
 
     p.started = context.currentTime;
 };
@@ -194,10 +226,7 @@ let pause_playing = (c) => {
     } catch (e) {
     }
 
-    let source = context.createBufferSource();
-    source.buffer = p.buffer;
-    source.onended = () => { on_end(c); };
-    p.source = source;
+    p.source = create_source(c, p.buffer);
 
     p.start += (context.currentTime - p.started);
     p.started = null;
@@ -228,8 +257,9 @@ let stop_playing = (c) => {
 /**
  * Called when a channel ends naturally, to move things along.
  */
-let on_end = (c) => {
-    if (c.playing !== null && c.playing.started !== null) {
+let on_end = (c, source) => {
+    if (c.playing !== null && c.playing.started !== null &&
+        (source === undefined || c.playing.source === source)) {
         stop_playing(c);
     }
 
@@ -303,13 +333,20 @@ let video_start = (c) => {
 
     }
 
-    setValue(c.relative_volume.gain, p.relative_volume);
+    setValue(c.relative_volume.gain, finite(p.relative_volume, 1.0));
 
     p.started = c.video_el.currentTime;  // XXX Probably not ready yet
 };
 
 let video_pause = (c) => {
     const p = c.playing;
+
+    if (p === null) {
+        c.paused = true;
+        c.video_el?.pause();
+        return;
+    }
+
     if (p.started === null) {
         return;
     }
@@ -384,9 +421,14 @@ renpyAudio.set_channel_count = (count) => {
 }
 
 
-renpyAudio.queue = (channel, file, name, synchro_start, fadein, tight, start, end, relative_volume, afid) => {
+renpyAudio.queue = (channel, file, name, synchro_start, fadein, tight, start, end, relative_volume, afid, array) => {
 
     const c = get_channel(channel);
+
+    start = Math.max(0, finite(start, 0));
+    end = finite(end, -1);
+    fadein = Math.max(0, finite(fadein, 0));
+    relative_volume = finite(relative_volume, 1.0);
 
     if (file.startsWith('url:')) {
         const url = new URL(file.slice(4), window.location);
@@ -483,7 +525,7 @@ renpyAudio.queue = (channel, file, name, synchro_start, fadein, tight, start, en
         fadein: fadein,
         fadeout: null,
         tight: tight,
-        file: file,
+        name: name,
         filter: renpyAudio.getFilter(afid),
         synchro_start: synchro_start,
     };
@@ -491,9 +533,7 @@ renpyAudio.queue = (channel, file, name, synchro_start, fadein, tight, start, en
     function reuseBuffer(c) {
         // We can re-use the audio buffer, but not the buffer source
         c.queued.buffer = c.playing.buffer;
-        c.queued.source = context.createBufferSource();
-        c.queued.source.buffer = c.playing.buffer;
-        c.queued.source.onended = () => { on_end(c); };
+        c.queued.source = create_source(c, c.playing.buffer);
 
         start_playing(c);
     }
@@ -503,7 +543,7 @@ renpyAudio.queue = (channel, file, name, synchro_start, fadein, tight, start, en
         c.paused = false;
     } else {
         c.queued = q;
-        if (c.playing.file === file) {
+        if (c.playing.name === name) {
             // Same file, re-use the data to reduce memory and CPU footprint
             if (c.playing.buffer !== null) {
                 reuseBuffer(c);
@@ -515,19 +555,20 @@ renpyAudio.queue = (channel, file, name, synchro_start, fadein, tight, start, en
         }
     }
 
-    const array = FS.readFile(file);
+    if (array === null) {
+        array = FS.readFile(file);
+    } else {
+        array = new Uint8Array(array);
+    }
+
     context.decodeAudioData(array.buffer, (buffer) => {
 
-        const source = context.createBufferSource();
-        source.buffer = buffer;
-        source.onended = () => { on_end(c); };
-
-        q.source = source;
+        q.source = create_source(c, buffer);
         q.buffer = buffer;
 
         start_playing(c);
 
-        if (c.playing === q && c.queued !== null && c.queued.file === q.file) {
+        if (c.playing === q && c.queued !== null && c.queued.name === q.name) {
             // Same file, re-use the data to reduce memory and CPU footprint
             reuseBuffer(c);
         }
@@ -563,6 +604,9 @@ renpyAudio.dequeue = (channel, even_tight) => {
 renpyAudio.fadeout = (channel, delay) => {
 
     let c = get_channel(channel);
+
+    delay = Math.max(0, finite(delay, 0));
+
     if (c.playing == null || c.playing.started == null) {
         c.playing = c.queued;
         c.queued = null;
@@ -675,6 +719,50 @@ renpyAudio.get_pos = (channel) => {
 };
 
 
+renpyAudio.seek = (channel, position) => {
+    let c = get_channel(channel);
+    let p = c.playing;
+
+    if (p === null) {
+        return;
+    }
+
+    position = Math.max(0, position);
+    if (p.end > 0) {
+        position = Math.min(position, p.end);
+    }
+
+    if (c.video && c.video_el) {
+        c.video_el.currentTime = position;
+        p.start = position;
+        p.started = c.paused ? null : c.video_el.currentTime;
+        return;
+    }
+
+    if (!p.buffer) {
+        return;
+    }
+
+    position = Math.min(position, p.buffer.duration);
+
+    if (p.source !== null && p.started !== null) {
+        renpyAudio.disconnectFilter(p.filter, p.source, c.destination);
+        try {
+            p.source.stop();
+        } catch (e) {
+        }
+    }
+
+    p.source = create_source(c, p.buffer);
+    p.start = position;
+    p.started = null;
+
+    if (!c.paused) {
+        start_playing(c);
+    }
+};
+
+
 renpyAudio.get_duration = (channel) => {
     let c = get_channel(channel);
     let p = c.playing;
@@ -714,7 +802,7 @@ renpyAudio.set_secondary_volume = (channel, volume, delay) => {
 
 renpyAudio.get_volume = (channel) => {
     const c = get_channel(channel);
-    return c.primary_volume.gain * 1000;
+    return c.primary_volume.gain.value * 1000;
 };
 
 
@@ -749,7 +837,7 @@ renpyAudio.periodic = () => {
 
         if (c.playing) {
             if (c.playing.synchro_start) {
-                if (c.buffer === null) {
+                if (c.playing.buffer === null) {
                     ready = false;
                 }
 
@@ -774,15 +862,127 @@ renpyAudio.periodic = () => {
     }
 };
 
+/* A map from voice name to voice object. */
+let tts_voices = { };
 
-renpyAudio.tts = (s, v) => {
+renpyAudio.tts = (s, v, rate, voice) => {
     v = v || 1.0;
+    rate = rate || 1.0;
 
     let u = new SpeechSynthesisUtterance(s);
     u.volume = v;
+    u.rate = rate;
+
+    let speechVoice = tts_voices[voice];
+    if (speechVoice) {
+        u.voice = speechVoice;
+    }
+
     speechSynthesis.cancel();
     speechSynthesis.speak(u);
 };
+
+
+renpyAudio.update_tts_voices = () => {
+    tts_voices = {};
+
+    let voices = (speechSynthesis && speechSynthesis.getVoices) ? Array.from(speechSynthesis.getVoices()) : [];
+    if (!voices.length) {
+        return;
+    }
+
+    let navLangs = (typeof navigator !== "undefined" && navigator.languages && navigator.languages.length)
+        ? Array.from(navigator.languages)
+        : [(typeof navigator !== "undefined" && (navigator.language || navigator.userLanguage)) || "en"];
+
+    let norm = (l) => (l || "").toLowerCase().replace(/_/g, "-");
+    let base = (l) => norm(l).split("-")[0];
+
+    let normNavLangs = navLangs.map(norm);
+    let normNavBases = navLangs.map(base);
+
+    let isNormalVoice = (v) => {
+        let name = v.name || "";
+        let lang = v.lang || "";
+        return !name.includes("+") && !name.includes("@") && !lang.includes("+");
+    };
+
+    let scoreVoice = (v) => {
+        let normal = isNormalVoice(v);
+        let vLang = norm(v.lang);
+        let vBase = base(v.lang);
+
+        let langRank = -1;
+        let exact = false;
+        for (let i = 0; i < normNavLangs.length; i++) {
+            if (vLang === normNavLangs[i]) {
+                langRank = i;
+                exact = true;
+                break;
+            } else if (vBase === normNavBases[i] && langRank === -1) {
+                langRank = i;
+                exact = false;
+            }
+        }
+
+        let tier;
+        if (normal) {
+            if (langRank !== -1) {
+                tier = exact ? 0 : 1;
+            } else {
+                tier = 2;
+            }
+        } else {
+            if (langRank !== -1) {
+                tier = 3;
+            } else {
+                tier = 4;
+            }
+        }
+
+        return {
+            tier: tier,
+            isDefault: v.default ? 0 : 1,
+            langRank: langRank === -1 ? 999 : langRank,
+            lang: v.lang || "",
+            name: v.name || "",
+        };
+    };
+
+    voices.sort((a, b) => {
+        let sA = scoreVoice(a);
+        let sB = scoreVoice(b);
+
+        if (sA.tier !== sB.tier) return sA.tier - sB.tier;
+        if (sA.isDefault !== sB.isDefault) return sA.isDefault - sB.isDefault;
+        if (sA.langRank !== sB.langRank) return sA.langRank - sB.langRank;
+        if (sA.lang !== sB.lang) return sA.lang.localeCompare(sB.lang);
+        return sA.name.localeCompare(sB.name);
+    });
+
+    let count = 0;
+    for (let v of voices) {
+        let key = v.lang + ": " + v.name;
+        if (!tts_voices[key]) {
+            tts_voices[key] = v;
+            count++;
+            if (count >= 25) {
+                break;
+            }
+        }
+    }
+}
+
+if (speechSynthesis) {
+    speechSynthesis.onvoiceschanged = renpyAudio.update_tts_voices;
+    renpyAudio.update_tts_voices();
+}
+
+
+renpyAudio.get_tts_voices = () => {
+    return JSON.stringify(Object.keys(tts_voices));
+}
+
 
 renpyAudio.can_play_types = (l) => {
     let a = document.createElement("audio");

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 # The path to a copy of Atom that's been installed globally, if one exists.
-# This is overidden by RENPY_ATOM, if set. If either is given, that is used
+# This is overridden by RENPY_ATOM, if set. If either is given, that is used
 # and no special handing of the .atom directory is performed.
 ATOM = None
 
@@ -15,7 +15,6 @@ import renpy
 
 
 class Editor(renpy.editor.Editor):
-
     has_projects = True
 
     def get_atom(self):
@@ -30,7 +29,7 @@ class Editor(renpy.editor.Editor):
             return atom
 
         DIR = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
-        DIR = os.path.join(renpy.exports.fsdecode(DIR), "atom")
+        DIR = os.path.join(DIR, "atom")
 
         if renpy.windows:
             atom = os.path.join(DIR, "atom-windows", "atom.exe")
@@ -48,7 +47,7 @@ class Editor(renpy.editor.Editor):
         return atom
 
     def begin(self, new_window=False, **kwargs):
-        self.args = [ ]
+        self.args = []
 
     def open(self, filename, line=None, **kwargs):
 
@@ -66,10 +65,7 @@ class Editor(renpy.editor.Editor):
 
         self.args.reverse()
 
-        args = [ atom ] + self.args
-        args = [ renpy.exports.fsencode(i) for i in args ]
-
-        subprocess.Popen(args)
+        subprocess.Popen([atom] + self.args)
 
 
 def main():

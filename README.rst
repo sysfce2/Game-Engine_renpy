@@ -30,6 +30,16 @@ The following branches are the most interesting.
 
     Feature releases are made from this branch.
 
+``work/``
+    Work branches contain work that that is intended to be merged into master or fix - pull requests, or pull requests
+    to be. These branches should start with work/<username>/ , or work/shared/ for work shared equally between multiple
+    contributors.
+
+    A github rule enforces that new branches much start  with work/.
+
+``history/``
+    Branches beginning with history/ contain commits that for various reasons are not included in the github interface.
+
 
 Getting Started
 ===============
@@ -206,7 +216,8 @@ acceptable.
 
 Our use of AI is intended to not require disclosure in the
 `Steam Content Survey <https://partner.steamgames.com/doc/gettingstarted/contentsurvey#5>`_. Specifically, we
-don't use diffusion models or other techniques to generate game content consumed by players.
+don't use diffusion models or other techniques to generate game content consumed by players, and we do not require
+creators to use any AI tools, or provide any such tools for creators to use.
 
 As a special case, we allow machine translation of system messages when there is no human translator for the language.
 When a human translator becomes available, their work takes precedence. This exception allows system messages to be

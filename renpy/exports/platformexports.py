@@ -174,13 +174,20 @@ def get_on_battery():
 sdl_dll = False
 
 
-def get_sdl_dll():
+def get_sdl_dll(version=2):
     """
     :doc: sdl
 
     Returns a ctypes.cdll object that refers to the library that contains
-    the instance of SDL2 that Ren'Py is using. If this fails, None is returned.
+    the instance of SDL3 that Ren'Py is using. If this fails, None is returned.
+
+    `version`
+        The version of SDL to look for. Currently only version 3 is supported, and a call without
+        a version will always return None.
     """
+
+    if version != 3:
+        return None
 
     global sdl_dll
 
@@ -192,13 +199,14 @@ def get_sdl_dll():
 
         DLLS = [
             None,
+            sys.executable,
             lib + "librenpython.dll",
             lib + "librenpython.dylib",
             lib + "librenpython.so",
             "librenpython.so",
-            "SDL2.dll",
-            "libSDL2.dylib",
-            "libSDL2-2.0.so.0",
+            "SDL3.dll",
+            "libSDL3.dylib",
+            "libSDL3.so.0",
         ]
 
         import ctypes
@@ -288,7 +296,7 @@ def request_permission(permission):
     if not renpy.android:
         return False
 
-    return get_sdl_dll().SDL_AndroidRequestPermission(permission.encode("utf-8"))  # type: ignore
+    return get_sdl_dll(3).SDL_AndroidRequestPermission(permission.encode("utf-8"))  # type: ignore
 
 
 def open_url(url):
@@ -307,3 +315,70 @@ def open_url(url):
         webbrowser.open_new(url)
     except Exception:
         pass
+
+
+def get_user_age():
+    """
+    :doc: age
+
+    Returns a range of ages for the user, if such can be determined. It returns a tuple of two integers, giving
+    the minimum and maximum age of the user. If the age cannot be determined, it returns (-1, 150).
+
+    This is limited by platform (currently Android and iOS 26+) and the information may only be available in regions of
+    the world where such information is required. It's intended to help you comply with age-related legal requirements,
+    but like the rest of Ren'Py, this feature comes with NO WARRANTY.
+
+    On Android, this uses the Play Age Signals API. By using it, you need to agree to the terms at `https://developer.android.com/google/play/age-signals/overview`_,
+    which include limits on how you can process age data.
+
+    On iOS, this uses the Declared Age Range API (iOS 26+). To enable it, you must add the
+    ``com.apple.developer.declared-age-range`` entitlement to your app by enabling the Declared Age Range
+    capability in Xcode. The entitlement is not present in the Ren'Py iOS template, so you must
+    opt in explicitly before submitting to App Store by going to Signing & Capabilities, clicking the + Capability
+    button, and adding Declared Age Range.
+
+    On unsupported platforms, if the entitlement is not available, or no valid age range can be determined, this
+    function returns False.
+    """
+
+    if renpy.android:
+        try:
+            import jnius
+            import time
+
+            Age = jnius.autoclass("org.renpy.android.Age")
+
+            if not Age.valid and not Age.inProgress:
+                Age.update(jnius.autoclass("org.renpy.android.PythonSDLActivity").mActivity)
+
+            start = time.time()
+            while Age.inProgress and time.time() - start < 1.0:
+                renpy.exports.pause(0)
+
+            if Age.valid:
+                return Age.ageLower, Age.ageUpper
+
+        except Exception:
+            pass
+
+    elif renpy.ios:
+        try:
+            from pyobjus import autoclass
+            import time
+
+            Age = autoclass("Age")
+
+            if not Age.valid and not Age.inProgress:
+                Age.update()
+
+            start = time.time()
+            while Age.inProgress and time.time() - start < 1.0:
+                renpy.exports.pause(0)
+
+            if Age.valid:
+                return Age.ageLower, Age.ageUpper
+
+        except Exception:
+            pass
+
+    return -1, 150

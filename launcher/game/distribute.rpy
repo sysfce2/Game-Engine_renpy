@@ -170,7 +170,7 @@ fix_dlc("renios", "renios")
 
         sha = hashlib.sha256()
 
-        with open(renpy.fsencode(fn), "rb") as f:
+        with open(fn, "rb") as f:
             while True:
 
                 data = f.read(8 * 1024 * 1024)
@@ -475,7 +475,7 @@ fix_dlc("renios", "renios")
         def split_by_prefix(self, prefix):
             """
             Returns two filelists, one that contains all the files starting with prefix,
-            and one tht contains all other files.
+            and one that contains all other files.
             """
 
             yes = FileList()
@@ -1321,7 +1321,7 @@ fix_dlc("renios", "renios")
 
             self.reporter.info(message)
 
-            cmd = [ renpy.fsencode(i.format(**kwargs)) for i in command ]
+            cmd = [ i.format(**kwargs) for i in command ]
 
             # print("\"" + "\" \"".join(cmd) + "\"")
 
@@ -1696,7 +1696,7 @@ fix_dlc("renios", "renios")
                         "json_url" : self.base_name + "-" + variant + ".update.json",
                         })
 
-                    fn = renpy.fsencode(os.path.join(self.destination, self.base_name + "-" + variant + ".update"))
+                    fn = os.path.join(self.destination, self.base_name + "-" + variant + ".update")
 
                     if os.path.exists(fn):
                         os.unlink(fn)
@@ -1714,17 +1714,19 @@ fix_dlc("renios", "renios")
             if not isinstance(update_data, bytes):
                 update_data = update_data.encode("utf-8")
 
-            fn = renpy.fsencode(os.path.join(self.destination, "updates.json"))
+            fn = os.path.join(self.destination, "updates.json")
             with open(fn, "wb") as f:
                 f.write(update_data)
 
             # Write the signed file.
-            with open(self.find_update_pem(), "rb") as f:
-                signing_key = renpy.ecsign.pem_to_der(f.read())
+            import renpy.ecsign as ecdsa
 
-            fn = renpy.fsencode(os.path.join(self.destination, "updates.ecdsa"))
+            with open(self.find_update_pem(), "rb") as f:
+                signing_key = ecdsa.SigningKey.from_pem(f.read())
+
+            fn = os.path.join(self.destination, "updates.ecdsa")
             with open(fn, "wb") as f:
-                f.write(renpy.ecsign.sign_data(update_data, signing_key))
+                f.write(signing_key.sign(update_data))
 
         def find_update_pem(self):
             if self.build['renpy']:
@@ -1733,12 +1735,14 @@ fix_dlc("renios", "renios")
                 return os.path.join(self.project.path, "update.pem")
 
         def make_key_pem(self):
+            import renpy.ecsign as ecdsa
+
             with open(self.find_update_pem(), "rb") as f:
-                signing_key = renpy.ecsign.pem_to_der(f.read())
+                signing_key = ecdsa.SigningKey.from_pem(f.read())
 
             key_pem = self.temp_filename("key.pem")
             with open(key_pem, "wb") as f:
-                f.write(renpy.ecsign.der_to_pem(renpy.ecsign.get_public_key_from_private(signing_key), "PUBLIC"))
+                f.write(signing_key.verifying_key.to_pem())
 
         def dump(self):
             for k, v in sorted(self.file_lists.items()):

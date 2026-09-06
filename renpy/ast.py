@@ -633,6 +633,7 @@ tuple[tuple[str, ...], str | None, str | None, list[str], str | None, str | None
 tuple[tuple[str, ...], list[str], str | None]
 """
 
+
 def get_imspec_tag(imspec: ImspecType) -> str | None:
     """
     Returns the tag of the given imspec, or None if it doesn't have one.
@@ -1066,7 +1067,15 @@ class Say(Node):
             pass
 
         if self.interact:
-            renpy.exports.scry_say(who, self.what, rv)
+            what = self.what
+
+            if renpy.config.say_menu_text_filter:
+                what = renpy.config.say_menu_text_filter(what)
+
+            for f in renpy.config.say_menu_text_filters:
+                what = f(what)
+
+            renpy.exports.scry_say(who, what, rv)
         else:
             rv.interacts = False
             rv.extend_text = DoesNotExtend
@@ -1619,7 +1628,6 @@ class With(Node):
 
     def predict(self):
         try:
-
             if self.expr is not None:
                 trans = renpy.python.py_eval(self.expr)
             else:

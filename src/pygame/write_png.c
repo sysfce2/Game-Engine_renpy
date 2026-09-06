@@ -33,30 +33,15 @@
 #define png_voidp voidp
 #endif
 
-int Pygame_SDL2_SavePNG(const char *file, SDL_Surface *surf,int compression){
-	SDL_RWops *fp;
-	int ret;
-
-	fp=SDL_RWFromFile(file,"wb");
-
-	if( fp == NULL ) {
-		return (-1);
-	}
-
-	ret=Pygame_SDL2_SavePNG_RW(fp,surf,compression);
-	SDL_RWclose(fp);
-	return ret;
-}
-
 static void png_write_data(png_structp png_ptr,png_bytep data, png_size_t length){
-	SDL_RWops *rp = (SDL_RWops*) png_get_io_ptr(png_ptr);
-	SDL_RWwrite(rp,data,1,length);
+	SDL_IOStream *rp = (SDL_IOStream*) png_get_io_ptr(png_ptr);
+	SDL_WriteIO(rp,data,length);
 }
 
-int Pygame_SDL2_SavePNG_RW(SDL_RWops *src, SDL_Surface *surf,int compression){
+int Pygame_SDL3_SavePNG_IO(SDL_IOStream *src, SDL_Surface *surf,int compression){
 	png_structp png_ptr;
 	png_infop info_ptr;
-	SDL_PixelFormat *fmt=NULL;
+	const SDL_PixelFormatDetails *fmt=NULL;
 	SDL_Surface *tempsurf=NULL;
 	int ret;
 	int i;
@@ -108,7 +93,7 @@ int Pygame_SDL2_SavePNG_RW(SDL_RWops *src, SDL_Surface *surf,int compression){
 	else
 		png_set_compression_level(png_ptr,compression);
 
-	fmt=surf->format;
+	fmt= SDL_GetPixelFormatDetails(surf->format);
 
 	if (fmt->Amask) {
 		png_set_IHDR(png_ptr,info_ptr,
@@ -124,22 +109,14 @@ int Pygame_SDL2_SavePNG_RW(SDL_RWops *src, SDL_Surface *surf,int compression){
 
 	png_write_info(png_ptr, info_ptr);
 
-#if SDL_BYTEORDER == SDL_LIL_ENDIAN
 	if (fmt->Amask) {
 		target_format = SDL_PIXELFORMAT_ABGR8888;
 	} else {
-		target_format = SDL_PIXELFORMAT_BGR888;
+		target_format = SDL_PIXELFORMAT_XBGR8888;
 	}
-#else
-	if (fmt->Amask) {
-		target_format = SDL_PIXELFORMAT_RGBA8888;
-	} else {
-		target_format = SDL_PIXELFORMAT_RGB888;
-	}
-#endif
 
-	if (surf->format->format != target_format) {
-		tempsurf = SDL_ConvertSurfaceFormat(surf, target_format, 0);
+	if (surf->format != target_format) {
+		tempsurf = SDL_ConvertSurface(surf, target_format);
 		surf = tempsurf;
 
 		if (!tempsurf){
@@ -155,7 +132,7 @@ int Pygame_SDL2_SavePNG_RW(SDL_RWops *src, SDL_Surface *surf,int compression){
 	png_write_image(png_ptr, row_pointers);
 
 	if (tempsurf) {
-		SDL_FreeSurface(tempsurf);
+		SDL_DestroySurface(tempsurf);
 	}
 
 	png_write_end(png_ptr, NULL);

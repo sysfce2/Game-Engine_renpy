@@ -1,7 +1,6 @@
 #include "renpy.h"
-#include "IMG_savepng.h"
-#include <SDL2/SDL.h>
-#include <renpy.pygame.surface_api.h>
+#include <SDL3/SDL.h>
+#include <renpy/pygame/surface_api.h>
 #include <stdio.h>
 #include <math.h>
 
@@ -13,15 +12,6 @@
  */
 void core_init() {
     import_renpy__pygame__surface();
-}
-
-void save_png_core(PyObject *pysurf, SDL_RWops *rw, int compress) {
-    SDL_Surface *surf;
-
-    surf = PySurface_AsSurface(pysurf);
-
-    /* Can't release GIL, since we're not using threaded RWops. */
-    renpy_IMG_SavePNG_RW(rw, surf, compress);
 }
 
 /* This pixellates a 32-bit RGBA pygame surface to a destination
@@ -1691,10 +1681,10 @@ void premultiply_alpha_core(PyObject *pysrc, PyObject *pydst) {
             b = *s++;
             a = *s++;
 
-            *d++ = (unsigned char) a;
-            *d++ = (unsigned char) ((b * a) / 255);
-            *d++ = (unsigned char) ((g * a) / 255);
             *d++ = (unsigned char) ((r * a) / 255);
+            *d++ = (unsigned char) ((g * a) / 255);
+            *d++ = (unsigned char) ((b * a) / 255);
+            *d++ = (unsigned char) a;
         }
     }
 
