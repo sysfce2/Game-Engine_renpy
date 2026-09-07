@@ -57,6 +57,15 @@ def hint(hint, value, priority=1):
 
     SDL_SetHintWithPriority(hint, value, priority)
 
+
+def set_windows_dpi_awareness(high_pixel_density):
+    if "SDL_WINDOWS_DPI_AWARENESS" in os.environ:
+        return
+
+    value = "permonitorv2" if high_pixel_density else "unaware"
+    hint("SDL_WINDOWS_DPI_AWARENESS", value, SDL_HINT_NORMAL)
+
+
 def _get_hint(hint, default):
     hint = str(hint)
 
@@ -177,7 +186,7 @@ cdef class Window:
                 raise error()
 
             if shape is not None:
-                SDL_SetWindowShape(self.window, shape.surface)
+                SDL_SetWindowShape(self.window, shape.sdl_surface)
 
 
             if pos != (SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED):
@@ -240,7 +249,7 @@ cdef class Window:
             if self.window_surface.format == SDL_PIXELFORMAT_RGBA32:
 
                 self.surface = Surface(())
-                self.surface.surface = self.window_surface
+                self.surface.sdl_surface = self.window_surface
                 self.surface.owns_surface = False
                 self.surface.window_surface = True
 
@@ -258,6 +267,8 @@ cdef class Window:
         if self.gl_context != NULL:
             SDL_GL_DestroyContext(self.gl_context)
 
+            self.gl_context = NULL
+
         if self.surface:
 
             # Break the cycle that prevents refcounting from collecting this
@@ -267,7 +278,11 @@ cdef class Window:
             # Necessary to collect the GL surface, doesn't hurt the window surface.
             self.surface = None
 
-        SDL_DestroyWindow(self.window)
+        # Cleared so that SDL never ends up with a dangling pointer.
+        if self.window != NULL:
+            SDL_DestroyWindow(self.window)
+
+            self.window = NULL
 
     def resize(self, size, opengl=False, fullscreen=None, maximized=None):
         """
@@ -358,7 +373,7 @@ cdef class Window:
         return rv
 
     def proxy_window_surface(self):
-        SDL_BlitSurface(self.surface.surface, NULL, self.window_surface, NULL)
+        SDL_BlitSurface(self.surface.sdl_surface, NULL, self.window_surface, NULL)
 
     def flip(self):
         cdef const char *err
@@ -376,7 +391,7 @@ cdef class Window:
 
         else:
 
-            if self.surface.surface != self.window_surface:
+            if self.surface.sdl_surface != self.window_surface:
                 self.proxy_window_surface()
 
             with nogil:
@@ -394,7 +409,7 @@ cdef class Window:
             self.flip()
             return
 
-        if self.surface.surface != self.window_surface:
+        if self.surface.sdl_surface != self.window_surface:
             self.proxy_window_surface()
 
         if not isinstance(rectangles, list):
@@ -442,7 +457,7 @@ cdef class Window:
         return True
 
     def set_icon(self, Surface surface):
-        SDL_SetWindowIcon(self.window, surface.surface)
+        SDL_SetWindowIcon(self.window, surface.sdl_surface)
 
     def set_caption(self, title):
 
@@ -457,6 +472,11 @@ cdef class Window:
         SDL_GetWindowSizeInPixels(self.window, &w, &h)
         return w, h
 
+    def get_window_display_scale(self):
+        return SDL_GetWindowDisplayScale(self.window)
+
+    def get_window_pixel_density(self):
+        return SDL_GetWindowPixelDensity(self.window)
 
     def get_size(self):
         cdef int w, h
@@ -514,6 +534,9 @@ def set_mode(resolution=(0, 0), flags=0, depth=0, pos=(SDL_WINDOWPOS_UNDEFINED, 
 
         else:
             main_window.destroy()
+
+            # Don't leave a destroyed window behind.
+            main_window = None
 
     main_window = Window(default_title, resolution, flags, depth, pos=pos)
 
@@ -784,6 +807,20 @@ def get_caption():
 def get_drawable_size():
     if main_window:
         return main_window.get_drawable_size()
+    return None
+
+def get_display_content_scale():
+    scale = SDL_GetDisplayContentScale(SDL_GetPrimaryDisplay())
+    return scale if scale > 0.0 else 1.0
+
+def get_window_display_scale():
+    if main_window:
+        return main_window.get_window_display_scale()
+    return None
+
+def get_window_pixel_density():
+    if main_window:
+        return main_window.get_window_pixel_density()
     return None
 
 def get_size():

@@ -533,8 +533,10 @@ from renpy.exports.predictexports import (
     expand_predict as expand_predict,
     predicting as predicting,
     start_predict_screen as start_predict_screen,
+    start_predict_shader as start_predict_shader,
     start_predict as start_predict,
     stop_predict_screen as stop_predict_screen,
+    stop_predict_shader as stop_predict_shader,
     stop_predict as stop_predict,
 )
 
@@ -595,9 +597,11 @@ from renpy.exports.scriptexports import (
 )
 
 from renpy.exports.statementexports import (
+    StatementInfo as StatementInfo,
     call_screen as call_screen,
     call as call,
     execute_default_statement as execute_default_statement,
+    get_statement_info as get_statement_info,
     get_statement_name as get_statement_name,
     imagemap as imagemap,
     jump as jump,

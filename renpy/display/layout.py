@@ -1763,6 +1763,8 @@ def ConditionSwitch(*args, **kwargs):
     for cond, d in zip(args[0::2], args[1::2]):
         if cond is True or cond is False or cond is None:
             code = cond
+        elif not isinstance(cond, str):
+            raise TypeError(f"ConditionSwitch conditions must be strings, True, False, or None, not {cond!r}")
         elif cond not in cond_cache:
             code = renpy.python.py_compile(cond, "eval")
             cond_cache[cond] = code
@@ -2093,6 +2095,9 @@ class Alpha(renpy.display.displayable.Displayable):
     def visit(self):
         return [self.child]
 
+    def predict_shaders(self, shaders):
+        return [(self.child, shaders + ("renpy.alpha",))]
+
     def render(self, height, width, st, at):
         if self.anim_timebase:
             t = at
@@ -2313,6 +2318,11 @@ class Flatten(Container):
     def get_placement(self):
         return self.child.get_placement()
 
+    def predict_shaders(self, shaders):
+        renpy.gl2.gl2shadercache.predict_shader(shaders + ("renpy.texture",))
+
+        return [(self.child, ())]
+
 
 class AlphaMask(Container):
     """
@@ -2360,6 +2370,11 @@ class AlphaMask(Container):
 
     def visit(self):
         return [self.mask, self.child]
+
+    def predict_shaders(self, shaders):
+        renpy.gl2.gl2shadercache.predict_shader(shaders + ("renpy.mask",))
+
+        return [(self.mask, ()), (self.child, ())]
 
     def render(self, width, height, st, at):
         cr = renpy.display.render.render(self.child, width, height, st, at)

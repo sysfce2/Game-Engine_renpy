@@ -16,7 +16,39 @@
 #    misrepresented as being the original software.
 # 3. This notice may not be removed or altered from any source distribution.
 
-from .sdl cimport SDL_IOStream
+from .sdl cimport SDL_IOStream, Sint64
 
-cdef SDL_IOStream *to_sdl_iostream(filelike, mode=*, base=*, length=*) except NULL
-cdef SDL_IOStream *SDLIOStreamFromPython(filelike) except NULL
+
+cdef class IOStream:
+    cdef SDL_IOStream *_stream
+    cdef bint _closed
+    cdef readonly str mode
+    cdef readonly str name
+
+    cdef SDL_IOStream *borrow(self) except NULL
+    cdef SDL_IOStream *take(self) except NULL
+
+
+cdef class IOPath(IOStream):
+    cdef readonly object path
+
+
+cdef class IOSubFile(IOStream):
+    cdef readonly object path
+    cdef readonly Sint64 base
+    cdef readonly Sint64 length
+
+
+cdef class IOBuffer(IOStream):
+    cdef readonly object buffer
+
+
+cdef class IOFileLike(IOStream):
+    cdef bint _readable
+    cdef bint _writable
+    cdef bint _seekable
+    cdef bint _close_filelike
+    cdef readonly object filelike
+
+
+cpdef IOStream open_io(object obj, str mode=*, str name=*)

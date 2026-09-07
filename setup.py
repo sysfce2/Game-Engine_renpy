@@ -50,15 +50,15 @@ def main():
         setuplib.include_dirs.append(f"{cubism}/Core/include")
 
     # src/ directory.
-    cython("_renpy", ["src/IMG_savepng.c", "src/core.c"], packages="sdl3 libpng")
+    cython("_renpy", ["src/core.c"], packages="sdl3 libpng")
 
     # renpy.pygame
     cython("renpy.pygame.iostream", packages="sdl3")
     cython("renpy.pygame.locals", packages="sdl3")
     cython(
         "renpy.pygame.image",
-        ["src/pygame/write_png.c", "src/pygame/write_jpeg.c"],
-        packages="sdl3-image libjpeg libpng sdl3",
+        ["src/pygame/write_png.c"],
+        packages="sdl3-image libpng sdl3",
     )
     cython("renpy.pygame.sdl_image", packages="sdl3")
     cython("renpy.pygame.controller", packages="sdl3")
@@ -91,15 +91,12 @@ def main():
     cython("renpy.style")
     cython("renpy.encryption")
     cython("renpy.tfd", ["src/tinyfiledialogs/tinyfiledialogs.c"], setup_filename="Setup.tfd")
-    cython("renpy.ecsign", ["src/ec_sign_core.c", "src/ec_sign_core_web.c"], packages="openssl")
 
     # renpy.audio
     cython(
         "renpy.audio.renpysound",
         ["src/renpysound_core.c", "src/ffmedia.c"],
-        compile_args=["-Wno-deprecated-declarations"]
-        if ("RENPY_FFMPEG_NO_DEPRECATED_DECLARATIONS" in os.environ)
-        else [],
+        compile_args=[] if "RENPY_FFMPEG_DEPRECATED_DECLARATIONS" in os.environ else ["-Wno-deprecated-declarations"],
         packages="libavformat libavcodec libavutil libswresample libswscale sdl3",
     )
 
@@ -131,6 +128,7 @@ def main():
     cython("renpy.gl2.gl2texture", packages="sdl3")
     cython("renpy.gl2.gl2uniform", packages="sdl3")
     cython("renpy.gl2.gl2shader", packages="sdl3")
+    cython("renpy.gl2.gl2statecache", packages="sdl3")
 
     if cubism:
         cython("renpy.gl2.live2dmodel", ["src/live2dcsm.c"], packages="sdl3")

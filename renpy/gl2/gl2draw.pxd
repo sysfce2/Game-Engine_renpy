@@ -23,6 +23,7 @@ from renpy.display.matrix cimport Matrix, Matrix2D
 cimport renpy.display.render as render
 from renpy.gl2.gl2texture cimport TextureLoader
 from renpy.gl2.gl2polygon cimport Polygon
+from renpy.gl2.gl2statecache cimport GLStateCache
 from renpy.display.render cimport Render
 
 from renpy.uguu.gl cimport *
@@ -91,6 +92,12 @@ cdef class GL2Draw:
     # The texture_loader singleton.
     cdef public TextureLoader texture_loader
 
+    cdef public GLStateCache state_cache
+
+    # The vertex array object bound for the lifetime of a core-profile
+    # context, which has no default one.
+    cdef GLuint default_vao
+
     # The default FBO.
     cdef public GLuint default_fbo
 
@@ -99,6 +106,10 @@ cdef class GL2Draw:
 
     # Was the window maximized?
     cdef public bint maximized
+
+    cdef bint context_uses_core_profile(self, object version) except *
+
+    cdef void create_default_vao(self) noexcept nogil
 
     cdef void change_fbo(self, GLuint fbo)
 
@@ -150,10 +161,13 @@ cdef class GL2DrawingContext:
     # winding order in the Ren'Py virtual coordinate system.
     cdef object cull_face
 
+    cdef GLStateCache state_cache
 
     cdef GL2DrawingContext child_context(self)
 
     cdef dict merge_properties(self, dict old, dict child)
+
+    cpdef void merge_uniforms(self, dict uniforms)
 
     cdef void correct_pixel_perfect(self)
 
