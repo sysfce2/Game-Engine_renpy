@@ -2720,12 +2720,14 @@ def load_cache():
             s = loads(zlib.decompress(f.read()))
 
         if s.version == scache.version:
-            renpy.game.script.update_bytecode()
+            # Compile all PyCode used by screens.
+            renpy.game.script.update_bytecode([])
             scache.const_analyzed.update(s.const_analyzed)
             scache.not_const_analyzed.update(s.not_const_analyzed)
 
     except Exception:
-        pass
+        renpy.display.log.write("While loading screen cache bytecode.")
+        renpy.display.log.exception()
 
 
 def save_cache():
