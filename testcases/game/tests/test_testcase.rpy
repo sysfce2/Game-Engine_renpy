@@ -231,7 +231,7 @@ testsuite selectors:
         assert eval button_release_result is None
 
         run Hide("button_release_origin")
-        
+
     testcase bounds_test:
         # Peg bounds: (100, 100) to (200, 200), size: (100, 100)
         # Hole bounds: (450, 140) to (600, 290), size: (150, 150)
@@ -326,6 +326,11 @@ testsuite selectors:
         scroll id "scroll_vp" amount 50
         click id "close_screen_button"
         assert not screen "scroll_screen"
+
+    testcase screen_and_id_selectors:
+        assert screen "main_menu"
+        assert id "quit_button"
+        assert screen "main_menu" id "quit_button"
 
 testsuite timeout:
     setup:
