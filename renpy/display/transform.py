@@ -155,11 +155,11 @@ class TransformState(renpy.object.Object):
             d[k] = getattr(ts, k)
 
         # Uniforms only live in __dict__ when explicitly set.
-        for k in uniforms.intersection(d):
+        for k in d.keys() & uniforms:
             if k not in src:
                 del d[k]
 
-        for k in uniforms.intersection(src):
+        for k in src.keys() & uniforms:
             d[k] = src[k]
 
         self.last_angle = ts.last_angle

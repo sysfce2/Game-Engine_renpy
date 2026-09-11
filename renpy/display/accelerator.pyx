@@ -967,7 +967,7 @@ cdef class RenderTransform:
 
         state_dict = state.__dict__
 
-        for name in renpy.display.transform.uniforms.intersection(state_dict):
+        for name in state_dict.keys() & renpy.display.transform.uniforms:
             value = state_dict[name]
 
             if isinstance(value, Displayable):
